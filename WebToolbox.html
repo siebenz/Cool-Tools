@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Media Toolbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <div class="container mx-auto p-6 max-w-5xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-extrabold text-indigo-400 tracking-tight">Media Toolbox</h1>
+            <p class="text-gray-400 mt-2">Convert, Combine, and Archive files locally in your browser.</p>
+        </header>
+
+        <div class="flex space-x-4 mb-6 border-b border-gray-700 pb-3">
+            <button onclick="switchTab('converter')" id="tab-converter" class="tab-btn px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium transition">Image Converter & Clipboard</button>
+            <button onclick="switchTab('combiner')" id="tab-combiner" class="tab-btn px-4 py-2 rounded-lg bg-gray-800 text-gray-400 hover:bg-gray-700 font-medium transition">PDF/Image Combiner</button>
+            <button onclick="switchTab('archiver')" id="tab-archiver" class="tab-btn px-4 py-2 rounded-lg bg-gray-800 text-gray-400 hover:bg-gray-700 font-medium transition">Zip Archiver</button>
+        </div>
+
+        <div id="panel-converter" class="tab-panel space-y-6">
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl">
+                <h2 class="text-xl font-bold mb-4 text-indigo-300">1. Upload or Paste an Image</h2>
+                <p class="text-sm text-gray-400 mb-4">Click to upload, drag & drop, or simply press <kbd class="bg-gray-700 px-1.5 py-0.5 rounded text-xs text-gray-200">Ctrl+V</kbd> (or <kbd class="bg-gray-700 px-1.5 py-0.5 rounded text-xs text-gray-200">Cmd+V</kbd>) anywhere on this tab to paste an image from your clipboard.</p>
+                
+                <div class="flex flex-col md:flex-row gap-6">
+                    <div class="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-600 rounded-lg p-6 bg-gray-800 hover:border-indigo-500 transition relative min-h-[250px]">
+                        <input type="file" id="converter-input" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                        <div id="converter-placeholder" class="text-center pointer-events-none">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4-4m4 42h8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <p class="mt-1 text-sm text-gray-300">Drop an image here, click to browse, or paste directly</p>
+                        </div>
+                        <img id="converter-preview" class="hidden max-h-64 rounded shadow-md object-contain" alt="Preview">
+                    </div>
+
+                    <div class="w-full md:w-64 flex flex-col justify-between space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Target Format</label>
+                            <select id="target-format" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white focus:outline-none focus:border-indigo-500">
+                                <option value="image/png">PNG</option>
+                                <option value="image/jpeg">JPG / JPEG</option>
+                                <option value="image/webp">WEBP</option>
+                                <option value="application/pdf">PDF</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-2">
+                            <button onclick="downloadConvertedFile()" id="btn-download-conv" disabled class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed font-medium py-2.5 px-4 rounded-lg transition shadow-md">
+                                Download File
+                            </button>
+                            <button onclick="copyToClipboard()" id="btn-copy-conv" disabled class="w-full bg-gray-700 hover:bg-gray-600 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed font-medium py-2.5 px-4 rounded-lg transition border border-gray-600">
+                                Copy Image to Clipboard
+                            </button>
+                            <p class="text-[11px] text-gray-400 text-center italic mt-1">Note: Browsers primarily support copying PNGs back to the clipboard.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-combiner" class="tab-panel hidden space-y-6">
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl">
+                <h2 class="text-xl font-bold mb-2 text-indigo-300">Combine Images & PDFs</h2>
+                <p class="text-sm text-gray-400 mb-4">Select multiple files (PNG, JPG, WEBP, or PDF) to merge them sequentially into a single high-quality PDF document.</p>
+                
+                <div class="border-2 border-dashed border-gray-600 rounded-lg p-6 bg-gray-800 text-center relative hover:border-indigo-500 transition mb-4">
+                    <input type="file" id="combiner-input" multiple accept="image/*,application/pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    <p class="text-sm text-gray-300">Click or drag files here to queue them for compilation</p>
+                </div>
+
+                <div id="combiner-queue-section" class="hidden">
+                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Files in Queue:</h3>
+                    <ul id="combiner-queue" class="bg-gray-900 border border-gray-700 rounded-lg divide-y divide-gray-700 mb-4 max-h-60 overflow-y-auto"></ul>
+                    
+                    <button onclick="generateCombinedPDF()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-4 rounded-lg transition shadow-md flex justify-center items-center">
+                        <span id="combiner-spinner" class="hidden animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
+                        Compile & Download Consolidated PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-archiver" class="tab-panel hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold mb-2 text-indigo-300">Create Zip Archive</h2>
+                        <p class="text-sm text-gray-400 mb-4">Select multiple files of any type to package them into a compressed `.zip` folder.</p>
+                        
+                        <div class="border-2 border-dashed border-gray-600 rounded-lg p-6 bg-gray-800 text-center relative hover:border-indigo-500 transition mb-4">
+                            <input type="file" id="compressor-input" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <p class="text-sm text-gray-300">Choose files to pack</p>
+                        </div>
+                        <ul id="compressor-queue" class="bg-gray-900 border border-gray-700 rounded-lg divide-y divide-gray-700 max-h-40 overflow-y-auto text-xs"></ul>
+                    </div>
+                    <button onclick="createZipArchive()" id="btn-zip" disabled class="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed font-medium py-2.5 px-4 rounded-lg transition">
+                        Download Zip Archive
+                    </button>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold mb-2 text-indigo-300">Extract Zip Archive</h2>
+                        <p class="text-sm text-gray-400 mb-4">Upload a `.zip` archive to unpack its components directly inside your browser.</p>
+                        
+                        <div class="border-2 border-dashed border-gray-600 rounded-lg p-6 bg-gray-800 text-center relative hover:border-indigo-500 transition mb-4">
+                            <input type="file" id="extractor-input" accept=".zip" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <p class="text-sm text-gray-300">Choose a .zip archive</p>
+                        </div>
+                        <ul id="extractor-queue" class="bg-gray-900 border border-gray-700 rounded-lg divide-y divide-gray-700 max-h-40 overflow-y-auto text-xs"></ul>
+                    </div>
+                    <div class="mt-4 text-[11px] text-amber-400 border border-amber-800/50 bg-amber-950/20 p-2.5 rounded-lg">
+                        <strong>A quick heads-up on .7z files:</strong> Creating or unpacking native 7z formats natively requires heavy external server environments or sluggish WebAssembly layers. To keep this tool lightning fast and lightweight, standard <strong>ZIP compression and decompression</strong> is fully operational right here!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Core Application State ---
+        let currentImageBlob = null;
+        let currentImageName = "image";
+        let combinerFiles = [];
+        let compressorFiles = [];
+
+        // --- Tab Controller Layout ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white');
+                btn.classList.add('bg-gray-800', 'text-gray-400', 'hover:bg-gray-700');
+            });
+            
+            document.getElementById(`panel-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.classList.remove('bg-gray-800', 'text-gray-400', 'hover:bg-gray-700');
+            activeBtn.classList.add('bg-indigo-600', 'text-white');
+        }
+
+        // --- TAB 1: IMAGE CONVERTER & CLIPBOARD PROCESSING ---
+        const convInput = document.getElementById('converter-input');
+        const convPreview = document.getElementById('converter-preview');
+        const convPlaceholder = document.getElementById('converter-placeholder');
+        const btnDownloadConv = document.getElementById('btn-download-conv');
+        const btnCopyConv = document.getElementById('btn-copy-conv');
+
+        // Handle uploaded image files
+        convInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                processIncomingImage(e.target.files[0]);
+            }
+        });
+
+        // Intercept global paste events for convenience
+        window.addEventListener('paste', (e) => {
+            const currentTab = document.getElementById('panel-converter').classList.contains('hidden') ? false : true;
+            if (!currentTab) return; // Only trigger if looking at the converter pane
+
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    currentImageName = "pasted-image-" + Date.now();
+                    processIncomingImage(blob);
+                    break;
+                }
+            }
+        });
+
+        function processIncomingImage(fileOrBlob) {
+            if (fileOrBlob instanceof File) {
+                currentImageName = fileOrBlob.name.split('.').slice(0, -1).join('.');
+            }
+            currentImageBlob = fileOrBlob;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                convPreview.src = e.target.result;
+                convPreview.classList.remove('hidden');
+                convPlaceholder.classList.add('hidden');
+                btnDownloadConv.removeAttribute('disabled');
+                btnCopyConv.removeAttribute('disabled');
+            };
+            reader.readAsDataURL(fileOrBlob);
+        }
+
+        // Convert Engine using Canvas Pipeline & PDF-Lib
+        async function renderToBlobOrPDF(targetFormat) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = async () => {
+                    if (targetFormat === 'application/pdf') {
+                        // PDF generation routing via PDF-Lib
+                        const pdfDoc = await PDFLib.PDFDocument.create();
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Use safe standard PNG array buffers to stitch the PDF logic
+                        const pngDataUrl = canvas.toDataURL('image/png');
+                        const pngBytes = await fetch(pngDataUrl).then(res => res.arrayBuffer());
+                        const embeddedImage = await pdfDoc.embedPng(pngBytes);
+                        
+                        const page = pdfDoc.addPage([img.width, img.height]);
+                        page.drawImage(embeddedImage, { x: 0, y: 0, width: img.width, height: img.height });
+                        
+                        const pdfBytes = await pdfDoc.save();
+                        resolve(new Blob([pdfBytes], { type: 'application/pdf' }));
+                    } else {
+                        // Canvas pipeline standard export wrapper
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob((blob) => resolve(blob), targetFormat, 0.92);
+                    }
+                };
+                img.src = convPreview.src;
+            });
+        }
+
+        async function downloadConvertedFile() {
+            const format = document.getElementById('target-format').value;
+            const outputBlob = await renderToBlobOrPDF(format);
+            
+            const extensions = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+            const ext = extensions[format];
+            
+            const url = URL.createObjectURL(outputBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentImageName}_converted.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function copyToClipboard() {
+            try {
+                // Browsers safely handle writing standard PNG elements to clipboard
+                const outputBlob = await renderToBlobOrPDF('image/png');
+                await navigator.clipboard.write([
+                    new ClipboardItem({ [outputBlob.type]: outputBlob })
+                ]);
+                alert('Success: Image encoded and copied to system clipboard!');
+            } catch (err) {
+                console.error(err);
+                alert('Error writing image structure to system clipboard.');
+            }
+        }
+
+        // --- TAB 2: MULTI-MEDIA PDF COMBINER ---
+        const combinerInput = document.getElementById('combiner-input');
+        const combinerQueue = document.getElementById('combiner-queue');
+        const combinerQueueSection = document.getElementById('combiner-queue-section');
+
+        combinerInput.addEventListener('change', (e) => {
+            for (let file of e.target.files) {
+                combinerFiles.push(file);
+            }
+            renderCombinerQueue();
+        });
+
+        function renderCombinerQueue() {
+            if (combinerFiles.length === 0) {
+                combinerQueueSection.classList.add('hidden');
+                return;
+            }
+            combinerQueueSection.classList.remove('hidden');
+            combinerQueue.innerHTML = '';
+            combinerFiles.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.className = "flex justify-between items-center px-4 py-2.5 text-sm";
+                li.innerHTML = `
+                    <span class="truncate max-w-md text-gray-300 font-mono">${file.name} <span class="text-xs text-gray-500">(${file.type || 'Unknown Format'})</span></span>
+                    <button onclick="removeCombinerFile(${index})" class="text-red-400 hover:text-red-300 transition text-xs font-medium">Remove</button>
+                `;
+                combinerQueue.appendChild(li);
+            });
+        }
+
+        function removeCombinerFile(index) {
+            combinerFiles.splice(index, 1);
+            renderCombinerQueue();
+        }
+
+        async function generateCombinedPDF() {
+            if (combinerFiles.length === 0) return;
+            const spinner = document.getElementById('combiner-spinner');
+            spinner.classList.remove('hidden');
+
+            try {
+                const mergedPdf = await PDFLib.PDFDocument.create();
+
+                for (let file of combinerFiles) {
+                    if (file.type === 'application/pdf') {
+                        const pdfBytes = await file.arrayBuffer();
+                        const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+                        const pages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                        pages.forEach(page => mergedPdf.addPage(page));
+                    } else if (file.type.startsWith('image/')) {
+                        // Standardize alternative images (like webp) safely inside temporary image tags
+                        const arrayBuffer = await file.arrayBuffer();
+                        let embeddedImg;
+                        
+                        if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
+                            embeddedImg = await mergedPdf.embedJpg(arrayBuffer);
+                        } else if (file.type === 'image/png') {
+                            embeddedImg = await mergedPdf.embedPng(arrayBuffer);
+                        } else {
+                            // High compatibility normalization route via HTML5 canvas for WebP formats
+                            const url = URL.createObjectURL(file);
+                            const img = await new Promise(resolve => {
+                                const i = new Image();
+                                i.onload = () => resolve(i);
+                                i.src = url;
+                            });
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            canvas.getContext('2d').drawImage(img, 0, 0);
+                            const normalizedBytes = await fetch(canvas.toDataURL('image/png')).then(r => r.arrayBuffer());
+                            embeddedImg = await mergedPdf.embedPng(normalizedBytes);
+                            URL.revokeObjectURL(url);
+                        }
+
+                        const page = mergedPdf.addPage([embeddedImg.width, embeddedImg.height]);
+                        page.drawImage(embeddedImg, { x: 0, y: 0, width: embeddedImg.width, height: embeddedImg.height });
+                    }
+                }
+
+                const mergedBytes = await mergedPdf.save();
+                const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+                const downloadUrl = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `combined_document_${Date.now()}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+            } catch (err) {
+                console.error(err);
+                alert('Compilation Exception: Processing structural error across target parameters.');
+            } finally {
+                spinner.classList.add('hidden');
+            }
+        }
+
+        // --- TAB 3: ARCHIVE COMPRESSION ENGINE (ZIP) ---
+        const compressorInput = document.getElementById('compressor-input');
+        const compressorQueue = document.getElementById('compressor-queue');
+        const btnZip = document.getElementById('btn-zip');
+
+        compressorInput.addEventListener('change', (e) => {
+            for (let file of e.target.files) {
+                compressorFiles.push(file);
+            }
+            renderCompressorQueue();
+        });
+
+        function renderCompressorQueue() {
+            if (compressorFiles.length === 0) {
+                btnZip.setAttribute('disabled', 'true');
+                compressorQueue.innerHTML = '';
+                return;
+            }
+            btnZip.removeAttribute('disabled');
+            compressorQueue.innerHTML = '';
+            compressorFiles.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.className = "flex justify-between items-center px-3 py-1.5 text-gray-300";
+                li.innerHTML = `
+                    <span class="truncate max-w-xs font-mono">${file.name}</span>
+                    <button onclick="removeCompressorFile(${index})" class="text-red-400 hover:text-red-300 transition text-[11px]">Remove</button>
+                `;
+                compressorQueue.appendChild(li);
+            });
+        }
+
+        function removeCompressorFile(index) {
+            compressorFiles.splice(index, 1);
+            renderCompressorQueue();
+        }
+
+        function createZipArchive() {
+            if (compressorFiles.length === 0) return;
+            const zip = new JSZip();
+            
+            compressorFiles.forEach(file => {
+                zip.file(file.name, file);
+            });
+            
+            zip.generateAsync({ type: 'blob' }).then(content => {
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `archive_${Date.now()}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // --- TAB 3: DECOMPRESSION EXTRACTION SYSTEM ---
+        const extractorInput = document.getElementById('extractor-input');
+        const extractorQueue = document.getElementById('extractor-queue');
+
+        extractorInput.addEventListener('change', (e) => {
+            if (e.target.files.length === 0) return;
+            const targetZipFile = e.target.files[0];
+            
+            JSZip.loadAsync(targetZipFile).then(zip => {
+                extractorQueue.innerHTML = '';
+                zip.forEach((relativePath, zipEntry) => {
+                    if (!zipEntry.dir) {
+                        const li = document.createElement('li');
+                        li.className = "flex justify-between items-center px-3 py-1.5 text-gray-300 text-xs";
+                        
+                        const fileLabel = document.createElement('span');
+                        fileLabel.className = "truncate max-w-xs font-mono";
+                        fileLabel.textContent = relativePath;
+                        
+                        const dlBtn = document.createElement('button');
+                        dlBtn.className = "text-indigo-400 hover:text-indigo-300 transition font-medium";
+                        dlBtn.textContent = "Download File";
+                        dlBtn.onclick = () => extractZipEntry(zipEntry);
+                        
+                        li.appendChild(fileLabel);
+                        li.appendChild(dlBtn);
+                        extractorQueue.appendChild(li);
+                    }
+                });
+            }).catch(err => {
+                console.error(err);
+                alert('Failure processing target Zip container structure.');
+            });
+        });
+
+        function extractZipEntry(entry) {
+            entry.async('blob').then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = entry.name.split('/').pop();
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+    </script>
+</body>
+</html>
